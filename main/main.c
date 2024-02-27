@@ -8,12 +8,22 @@
 #include "nvs_flash.h" //non volatile storage
 #include "lwip/err.h" //light weight ip packets error handling
 #include "lwip/sys.h" //system applications for light weight ip apps
+#include "mqtt_client.h" //provides important functions to connect with MQTT
+#include "protocol_examples_common.h" //important for running different protocols in code
+#include "freertos/task.h" //MQTT communication often involves asynchronous operations, and FreeRTOS helps handle those tasks effectively
 
-//===========================WIFI===============================================================
+
+//=========================== Definições ================================================================================================================
+
+
 
 const char *ssid = "Rapozo";
 const char *pass = "74856191";
 int retry_num=0;
+static const char *TAG = "MQTT_EXAMPLE";
+
+//=========================== WIFI =======================================================================================================================
+
 
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id,void *event_data){
 if(event_id == WIFI_EVENT_STA_START)
@@ -66,7 +76,59 @@ void wifi_connection()
     printf( "wifi_init_softap finished. SSID:%s  password:%s",ssid,pass);
     
 }
-//======================================== Task geral ======================================================
+
+
+
+//======================================== MQTT ==============================================================================================================
+
+static void mqtt_event_handler(esp_mqtt_event_handle_t event){ //here esp_mqtt_event_handle_t is a struct which receieves struct event from mqtt app start funtion
+esp_mqtt_client_handle_t client = event->client; //making obj client of struct esp_mqtt_client_handle_t and assigning it the receieved event client
+  if(event->event_id == MQTT_EVENT_CONNECTED){
+  ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+  esp_mqtt_client_subscribe(client,"your topic",0); //in mqtt we require a topic to subscribe and client is from event client and 0 is quality of service it can be 1 or 2
+  ESP_LOGI(TAG, "sent subscribe successful" );
+  }
+  else if(event->event_id == MQTT_EVENT_DISCONNECTED)
+  {
+    ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED"); //if disconnected
+  }
+  else if(event->event_id == MQTT_EVENT_SUBSCRIBED)
+  {
+    ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED");
+  }
+  else if(event->event_id == MQTT_EVENT_UNSUBSCRIBED) //when subscribed
+  {
+    ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED");
+  }
+  else if(event->event_id == MQTT_EVENT_DATA)//when unsubscribed
+  {
+    ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+  }
+  else if(event->event_id == MQTT_EVENT_ERROR)//when any error
+  {
+    ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+  }
+}
+
+static void mqtt_initialize(void)
+{/*Depending on your website or cloud there could be more parameters in mqtt_cfg.*/
+  const esp_mqtt_client_config_t mqtt_cfg = {
+    .uri="mqtt://io.adafruit.com", //Uniform Resource Identifier includes path,protocol
+    .event_handle = mqtt_event_handler, //described above event handler
+    .username="",/*your username*/ //your username
+    .password="",/*your adafruit password*/ //your adafruit io password
+  };
+  esp_mqtt_client_handle_t client=esp_mqtt_client_init(&mqtt_cfg); //sending struct as a parameter in init client function
+  esp_mqtt_client_start(client); //starting the process
+}
+
+
+
+//======================================== Task geral ==============================================================================================================
+
+
+
+
 void vTaskCode(void *pvParameters) {
     int i = 1;
 
@@ -78,9 +140,15 @@ void vTaskCode(void *pvParameters) {
     }
 }
 
-void app_main(void) {
 
-    nvs_flash_init();
-    wifi_connection();
-    xTaskCreate(vTaskCode, "task1", 2048, NULL, 1, NULL);
+
+
+//======================================== Main ===================================================================================================================
+
+
+void app_main(void) {
+  nvs_flash_init(); //keeps stored important wifi configs like ssid and password also mqtt configs code will not work without it
+  wifi_connection(); // connects to wifi 
+  vTaskDelay(10000 /portTICK_PERIOD_MS); //delay is important cause we need to let it connect to wifi 
+  mqtt_app_start(); // MQTT start app as shown above most important code for MQTT   
 }

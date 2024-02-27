@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "IHM1",
-    "project_version":    "1",
+    "project_version":    "9f5ffa3-dirty",
     "project_path":       "C:/Users/ascer/esp/IHM1",
     "idf_path":           "C:/Users/ascer/esp/esp-idf",
     "build_dir":          "C:/Users/ascer/esp/IHM1/build",
